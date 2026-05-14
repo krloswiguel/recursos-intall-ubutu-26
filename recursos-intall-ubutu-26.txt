@@ -1,0 +1,123 @@
+0Edita el archivo:
+sudo nano /etc/netplan/00-installer-config.yaml
+
+Asegúrate de que tenga esta estructura exacta (incluyendo la línea renderer):
+
+YAML
+network:
+  version: 2
+  renderer: networkd
+  ethernets:
+    ens18:
+      addresses:
+        - 192.168.100.10/24
+      routes:
+        - to: default
+          via: 192.168.100.1
+      nameservers:
+        addresses: [8.8.8.8, 1.1.1.1]
+      mtu: 1400
+🚀 2. Activación de Servicios Críticos
+El error en image_847900.png indica que el servicio está apagado. Vamos a forzar su inicio y habilitarlo
+para que persista tras los reinicios:
+
+Bash
+# Iniciar y habilitar el demonio de red
+sudo systemctl enable systemd-networkd
+sudo systemctl start systemd-networkd
+
+# Verificar que el servicio dbus-org.freedesktop.network1 esté disponible
+sudo systemctl unmask systemd-networkd
+📈 3. Aplicación de la Configuración
+Una vez que el servicio esté corriendo, aplica los cambios. Si estás por SSH, usa try para evitar quedar 
+fuera del servidor si hay un error:
+
+Bash
+# Probar la configuración (tienes 120s para confirmar)
+sudo netplan try
+
+# Si todo es correcto, aplica definitivamente
+sudo netplan apply
+📉 4. Verificación de Optimización Neotech
+Para confirmar que el MTU y la ruta han sido aceptados por el kernel del Xeon E5-2695 v4:
+
+Bash
+# Verificar MTU en ens18
+ip link show ens18 | grep mtu
+
+# Verificar tabla de rutas
+ip route show
+Nota de Ingeniería: El error de "Permiso denegado" que viste al inicio es normal; recuerda que para ver el contenido 
+del archivo debes usar cat o nano, nunca intentar ejecutarlo con ./ o sudo /path/to/file.yaml.
+----------------------------------------------------------------------------------------------------------------------------------
+
+Ejecuta este script para preparar el entorno de codificación:
+
+Bash
+# 1. Instalar herramientas de monitoreo y dependencias de video
+sudo apt update && sudo apt install -y \
+    htop nload ffmpeg vlc \
+    build-essential libpcre3-dev libssl-dev zlib1g-dev
+
+# 2. Instalación de OBS Studio (PPA Oficial) para el codificador x264
+sudo add-apt-repository ppa:obsproject/obs-studio -y
+sudo apt update && sudo apt install -y obs-studio
+
+# 3. Optimización de límites de archivos para streaming masivo
+echo "* soft nofile 1048576" | sudo tee -a /etc/security/limits.conf
+echo "* hard nofile 1048576" | sudo tee -a /etc/security/limits.conf
+🛡️ Auditoría de Seguridad Inicial
+Dado que ya tienes una IP estática configurada (192.168.100.10), es imperativo asegurar los puertos de ingesta. 
+Si planeas usar este nodo como receptor SRT, debemos abrir el puerto específico en el firewall del host:
+
+Bash
+# Abrir puerto SRT por defecto (UDP)
+sudo ufw allow 5002/udp
+# Abrir puerto para la API de Restreamer si aplica (TCP)
+sudo ufw allow 8080/tcp
+sudo ufw enable
+
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+maestro (Bash) diseñado para instalar y optimizar toda la pila tecnológica de transmisión, desarrollo y red en un solo paso.
+Este script prepara la instancia de Ubuntu 26.04 para manejar codificación en tiempo real, contenedores, y desarrollo backend 
+de alto rendimiento.
+Ejecuta el siguiente bloque en tu terminal con privilegios de superusuario (sudo):
+
+Bash
+#!/bin/bash
+# Despliegue de Infraestructura de Streaming y Desarrollo - Ubuntu 26.04 LTS
+
+echo "[1/6] Actualizando el sistema base..."
+sudo apt update && sudo apt upgrade -y
+
+echo "[2/6] Instalando utilidades de sistema, red y agentes de Proxmox..."
+sudo apt install -y curl wget git htop bmon nload sysstat \
+    qemu-guest-agent spice-vdagent build-essential libssl-dev sqlite3
+
+echo "[3/6] Instalando OBS Studio y FFmpeg (Codificación de Video)..."
+sudo add-apt-repository ppa:obsproject/obs-studio -y
+sudo apt update
+sudo apt install -y obs-studio ffmpeg vlc
+
+echo "[4/6] Preparando entorno de desarrollo (Node.js y Go)..."
+# Instalación de Node.js (LTS)
+curl -fsSL https://deb.nodesource.com/setup_lts.x | sudo -E bash -
+sudo apt install -y nodejs
+# Instalación de Go (Golang)
+sudo snap install go --classic
+
+echo "[5/6] Instalando Docker (Infraestructura para Datarhei/Restreamer)..."
+sudo apt install -y docker.io docker-compose
+sudo systemctl enable --now docker
+
+echo "[6/6] Aplicando reglas de Firewall (UFW) para Streaming..."
+sudo ufw allow 22/tcp      # SSH Management
+sudo ufw allow 5002/udp    # Ingreso SRT
+sudo ufw allow 1935/tcp    # Ingreso/Egreso RTMP
+sudo ufw allow 8080/tcp    # API/Web UI (Restreamer/Nimble)
+sudo ufw allow 80/tcp      # HTTP
+sudo ufw allow 443/tcp     # HTTPS
+# sudo ufw enable          # Descomentar tras confirmar que no se perderá el acceso SSH
+
+echo "Despliegue finalizado. Por favor, reinicie la máquina virtual para que los agentes de VirtIO y el nuevo kernel se sincronicen correctamente."
+Nota de Seguridad: He dejado el comando sudo ufw enable comentado por precaución.
